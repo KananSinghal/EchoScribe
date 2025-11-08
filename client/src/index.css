@@ -1,0 +1,13 @@
+/* --- Global Stylesheet (client/src/index.css) --- */
+
+/* Import Tailwind CSS directives. 
+   These are required for Tailwind to process your utility classes. */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Apply a global font and background for a consistent look */
+body {
+  font-family: 'Inter', sans-serif;
+  background-color: #1f2937; /* Dark gray background */
+}

@@ -137,3 +137,20 @@ dist
 # Vite logs files
 vite.config.js.timestamp-*
 vite.config.ts.timestamp-*
+
+
+# This file tells Git which files to ignore.
+# We don't want to upload our secrets or temporary files.
+
+# --- Node.js ---
+# Huge folder of temporary packages
+node_modules/
+
+# --- Secrets ---
+# Your secret keys file
+.env
+server/.env
+
+# --- OS Files ---
+.DS_Store
+Thumbs.db
