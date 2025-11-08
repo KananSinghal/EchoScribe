@@ -1,5 +1,8 @@
 # EchoScribe
 Voice Note and Transcription web app.
+
+
+
 / (echoscribe)
 ├── .env.example
 ├── .gitignore
