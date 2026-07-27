@@ -29,13 +29,14 @@ yarn-error.log*
 
 # environment files
 .env*
-!.env.example
+.dev.vars*
 
 # vercel
 .vercel
 
 # typescript
 next-env.d.ts
+*.tsbuildinfo
 /dist/
 /.wrangler/
 /.sites-runtime/

@@ -3,9 +3,7 @@ import type { VoiceNote } from "../types";
 type RuntimeEnv = {
   DB: D1Database;
   BUCKET: R2Bucket;
-  OPENAI_API_KEY?: string;
-  OPENAI_TRANSCRIPTION_MODEL?: string;
-  DAILY_TRANSCRIPTION_LIMIT?: string;
+  DAILY_NOTE_LIMIT?: string;
 };
 
 type NoteRow = {
@@ -67,19 +65,18 @@ export async function ensureDatabase() {
 }
 
 export async function getOwnerId(request: Request) {
-  const email = request.headers.get("oai-authenticated-user-email");
-  const hostname = new URL(request.url).hostname;
-  const isLocal =
-    hostname === "localhost" ||
-    hostname === "127.0.0.1" ||
-    hostname === "terminal.local";
+  const sessionId = request.headers.get("x-echoscribe-session");
+  const validSession =
+    sessionId &&
+    /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
+      sessionId,
+    );
 
-  if (!email && !isLocal) {
-    throw new ApiError(401, "Sign in to open your private voice library.");
+  if (!validSession) {
+    throw new ApiError(401, "Refresh the page to start your browser session.");
   }
 
-  const source = (email || "local-preview-user").trim().toLowerCase();
-  const bytes = new TextEncoder().encode(source);
+  const bytes = new TextEncoder().encode(`browser:${sessionId.toLowerCase()}`);
   const digest = await crypto.subtle.digest("SHA-256", bytes);
   return Array.from(new Uint8Array(digest))
     .map((value) => value.toString(16).padStart(2, "0"))
