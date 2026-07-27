@@ -10,7 +10,3 @@ export type VoiceNote = {
   createdAt: string;
   updatedAt: string;
 };
-
-export type NotesResponse = {
-  notes: VoiceNote[];
-};

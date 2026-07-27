@@ -10,7 +10,7 @@ transcript in the browser, and keeps every note searchable.
 - Run a quantized Whisper model on the visitor's device
 - Search note titles and transcript text
 - Replay, rename, copy, download, and delete notes
-- Keep demo visitors separate with a browser session cookie
+- Keep every visitor's notes private to their own browser
 
 ## Stack
 
@@ -18,14 +18,14 @@ transcript in the browser, and keeps every note searchable.
 - Vinext with the Next.js App Router
 - Transformers.js with `onnx-community/whisper-tiny`
 - Cloudflare Workers
-- Cloudflare D1 for note information
-- Cloudflare R2 for audio files
+- IndexedDB for browser-local notes and audio
 
 ## How free transcription works
 
 The browser downloads a small quantized Whisper model from Hugging Face and
-runs it locally using ONNX Runtime Web. The recording is sent to Cloudflare
-only after the transcript is complete, so no transcription API key is needed.
+runs it locally using ONNX Runtime Web. The recording and transcript stay in
+the visitor's browser, so no transcription API key or storage subscription is
+needed.
 
 The first transcription takes longer because the model must be downloaded.
 Later attempts reuse the browser cache. Chrome and Edge usually provide the
@@ -40,7 +40,7 @@ npm install
 npm run dev
 ```
 
-Local D1 and R2 storage is created automatically by Wrangler.
+Notes are saved in the browser's IndexedDB storage.
 
 ## Deploy to Cloudflare Workers
 
@@ -64,12 +64,8 @@ Deploy:
 npm run deploy
 ```
 
-The first deployment automatically creates the D1 database and R2 bucket.
 Wrangler prints the public `workers.dev` URL when deployment finishes. There is
-no OpenAI key to add.
-
-After deployment, Wrangler may add generated D1 and R2 resource details to
-`wrangler.jsonc`. These IDs are not secret and can be committed.
+no OpenAI key, R2 subscription, database, or secret to add.
 
 ## Checks
 
@@ -81,9 +77,10 @@ npm test
 
 ## Demo privacy
 
-Each browser gets a random session cookie so visitors do not see one another's
-notes. This is suitable for a portfolio demo, but it is not a complete account
-system. Do not upload sensitive recordings to a public demo.
+Notes and recordings are stored in IndexedDB on the visitor's own device.
+Different visitors cannot see one another's notes. Clearing the browser's site
+data also removes the saved notes, so this setup is best suited to a portfolio
+demo rather than a synced account system.
 
 ## License
 

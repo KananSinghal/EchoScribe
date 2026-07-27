@@ -16,8 +16,7 @@
     "test": "npm run build && node --test tests/rendered-html.test.mjs",
     "typecheck": "tsc --noEmit",
     "types": "wrangler types",
-    "lint": "eslint .",
-    "db:generate": "drizzle-kit generate"
+    "lint": "eslint ."
   },
   "dependencies": {
     "drizzle-orm": "0.45.2",

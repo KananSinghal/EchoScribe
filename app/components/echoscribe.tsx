@@ -22,7 +22,14 @@ import {
   UploadIcon,
 } from "./icons";
 import { transcribeAudioInBrowser } from "../lib/browser-transcription";
-import type { NotesResponse, VoiceNote } from "../types";
+import {
+  createLocalNote,
+  deleteLocalNote,
+  listLocalNotes,
+  releaseAudioUrl,
+  renameLocalNote,
+} from "../lib/local-notes";
+import type { VoiceNote } from "../types";
 
 const MAX_FILE_SIZE = 25 * 1024 * 1024;
 const ACCEPTED_EXTENSIONS = [
@@ -74,13 +81,6 @@ function validateAudio(file: File) {
   return "";
 }
 
-async function requestNotes() {
-  const response = await fetch("/api/notes", { cache: "no-store" });
-  const data = (await response.json()) as NotesResponse & { error?: string };
-  if (!response.ok) throw new Error(data.error || "Could not load your notes.");
-  return data.notes;
-}
-
 export function EchoScribe() {
   const [notes, setNotes] = useState<VoiceNote[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -88,6 +88,7 @@ export function EchoScribe() {
   const [loadError, setLoadError] = useState("");
   const [search, setSearch] = useState("");
   const [toast, setToast] = useState("");
+  const notesRef = useRef<VoiceNote[]>([]);
 
   const selectedNote =
     notes.find((note) => note.id === selectedId) ?? notes[0] ?? null;
@@ -95,8 +96,11 @@ export function EchoScribe() {
   const loadNotes = useCallback(async () => {
     setLoading(true);
     try {
-      const loadedNotes = await requestNotes();
-      setNotes(loadedNotes);
+      const loadedNotes = await listLocalNotes();
+      setNotes((current) => {
+        current.forEach(releaseAudioUrl);
+        return loadedNotes;
+      });
       setSelectedId((current) => current ?? loadedNotes[0]?.id ?? null);
       setLoadError("");
     } catch (error) {
@@ -110,9 +114,12 @@ export function EchoScribe() {
 
   useEffect(() => {
     let active = true;
-    requestNotes()
+    listLocalNotes()
       .then((loadedNotes) => {
-        if (!active) return;
+        if (!active) {
+          loadedNotes.forEach(releaseAudioUrl);
+          return;
+        }
         setNotes(loadedNotes);
         setSelectedId(loadedNotes[0]?.id ?? null);
         setLoadError("");
@@ -130,6 +137,14 @@ export function EchoScribe() {
     return () => {
       active = false;
     };
+  }, []);
+
+  useEffect(() => {
+    notesRef.current = notes;
+  }, [notes]);
+
+  useEffect(() => {
+    return () => notesRef.current.forEach(releaseAudioUrl);
   }, []);
 
   useEffect(() => {
@@ -154,12 +169,18 @@ export function EchoScribe() {
 
   function updateNote(note: VoiceNote) {
     setNotes((current) =>
-      current.map((item) => (item.id === note.id ? note : item)),
+      current.map((item) => {
+        if (item.id !== note.id) return item;
+        releaseAudioUrl(item);
+        return note;
+      }),
     );
   }
 
   function removeNote(id: string) {
     setNotes((current) => {
+      const removed = current.find((note) => note.id === id);
+      if (removed) releaseAudioUrl(removed);
       const remaining = current.filter((note) => note.id !== id);
       if (selectedId === id) setSelectedId(remaining[0]?.id ?? null);
       return remaining;
@@ -437,18 +458,8 @@ function CapturePanel({
       const transcript = await transcribeAudioInBrowser(audioFile, setMessage);
       setMessage("Saving note...");
 
-      const form = new FormData();
-      form.append("audio", audioFile);
-      form.append("title", title.trim());
-      form.append("transcript", transcript);
-
-      const response = await fetch("/api/notes", {
-        method: "POST",
-        body: form,
-      });
-      const data = (await response.json()) as VoiceNote & { error?: string };
-      if (!response.ok) throw new Error(data.error || "Transcription failed.");
-      onNoteAdded(data);
+      const note = await createLocalNote(title, transcript, audioFile);
+      onNoteAdded(note);
       setAudioFile(null);
       setTitle("");
       setRecordingSeconds(0);
@@ -476,9 +487,8 @@ function CapturePanel({
       </div>
       <div className="panel-body">
         <p className="intro-copy">
-          Record a thought or upload existing audio. EchoScribe keeps the
-          recording and turns speech into searchable text directly in your
-          browser.
+          Record a thought or upload existing audio. EchoScribe transcribes and
+          saves it only in this browser, without sending it to a paid service.
         </p>
 
         <div className="mode-tabs" role="tablist" aria-label="Audio source">
@@ -665,18 +675,13 @@ function TranscriptPanel({
   }
 
   async function saveTitle() {
+    if (!note) return;
     const cleanTitle = title.trim();
-    if (!cleanTitle || cleanTitle === note?.title) return;
+    if (!cleanTitle || cleanTitle === note.title) return;
     setSaving(true);
     try {
-      const response = await fetch(`/api/notes/${note?.id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ title: cleanTitle }),
-      });
-      const data = (await response.json()) as VoiceNote & { error?: string };
-      if (!response.ok) throw new Error(data.error || "Could not rename note.");
-      onUpdated(data);
+      const updatedNote = await renameLocalNote(note.id, cleanTitle);
+      onUpdated(updatedNote);
       onToast("Title updated.");
     } catch (error) {
       onToast(error instanceof Error ? error.message : "Could not rename note.");
@@ -708,11 +713,7 @@ function TranscriptPanel({
   async function deleteNote() {
     if (!note || !window.confirm(`Delete "${note.title}"?`)) return;
     try {
-      const response = await fetch(`/api/notes/${note.id}`, {
-        method: "DELETE",
-      });
-      const data = (await response.json()) as { error?: string };
-      if (!response.ok) throw new Error(data.error || "Could not delete note.");
+      await deleteLocalNote(note.id);
       onDeleted(note.id);
       onToast("Voice note deleted.");
     } catch (error) {
