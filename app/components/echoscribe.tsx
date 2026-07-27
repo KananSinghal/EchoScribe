@@ -21,6 +21,7 @@ import {
   TrashIcon,
   UploadIcon,
 } from "./icons";
+import { transcribeAudioInBrowser } from "../lib/browser-transcription";
 import type { NotesResponse, VoiceNote } from "../types";
 
 const MAX_FILE_SIZE = 25 * 1024 * 1024;
@@ -430,13 +431,18 @@ function CapturePanel({
     }
 
     setSubmitting(true);
-    setMessage("");
-    const form = new FormData();
-    form.append("audio", audioFile);
-    form.append("title", title.trim());
+    setMessage("Preparing audio...");
 
     try {
-      const response = await fetch("/api/notes/transcribe", {
+      const transcript = await transcribeAudioInBrowser(audioFile, setMessage);
+      setMessage("Saving note...");
+
+      const form = new FormData();
+      form.append("audio", audioFile);
+      form.append("title", title.trim());
+      form.append("transcript", transcript);
+
+      const response = await fetch("/api/notes", {
         method: "POST",
         body: form,
       });
@@ -471,7 +477,8 @@ function CapturePanel({
       <div className="panel-body">
         <p className="intro-copy">
           Record a thought or upload existing audio. EchoScribe keeps the
-          recording and turns every spoken word into searchable text.
+          recording and turns speech into searchable text directly in your
+          browser.
         </p>
 
         <div className="mode-tabs" role="tablist" aria-label="Audio source">
@@ -584,7 +591,7 @@ function CapturePanel({
             type="submit"
             disabled={!audioFile || submitting || recording}
           >
-            {submitting ? "Transcribing audio..." : "Transcribe and save"}
+            {submitting ? "Working on this device..." : "Transcribe and save"}
           </button>
           {message && (
             <p className="form-message" role="status">

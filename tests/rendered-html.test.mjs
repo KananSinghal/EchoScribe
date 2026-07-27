@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readFile } from "node:fs/promises";
 import test from "node:test";
 
 test("renders the EchoScribe workspace", async () => {
@@ -26,8 +27,19 @@ test("renders the EchoScribe workspace", async () => {
     response.headers.get("content-type") ?? "",
     /^text\/html\b/i,
   );
+  assert.match(
+    response.headers.get("set-cookie") ?? "",
+    /echoscribe_session=[0-9a-f-]+/i,
+  );
   const html = await response.text();
   assert.match(html, /EchoScribe/);
   assert.match(html, /Capture audio/);
   assert.match(html, /Voice notes/);
+
+  const transcriptionWorker = await readFile(
+    new URL("../dist/client/transcription.worker.js", import.meta.url),
+    "utf8",
+  );
+  assert.match(transcriptionWorker, /onnx-community\/whisper-tiny/);
+  assert.match(transcriptionWorker, /cdn\.jsdelivr\.net/);
 });
